@@ -88,3 +88,38 @@ def test_lego_feedback_parsing(caplog):
     with caplog.at_level("INFO", logger="jingle_rails"):
         hub_notification(None, bytes.fromhex("0500820102"))
     assert "Retour commande LEGO" in caplog.text
+
+
+def test_subscription_before_first_command(monkeypatch):
+    import bleak
+    from jingle_rails.__main__ import hub_connection
+    from jingle_rails.core import CHARACTERISTIC
+
+    events = []
+
+    class MockHub:
+        is_connected = False
+        def __init__(self, *_args, **_kwargs):
+            pass
+        async def connect(self):
+            self.is_connected = True
+            events.append("connect")
+        async def start_notify(self, characteristic, callback):
+            assert characteristic == CHARACTERISTIC
+            events.append("notify")
+        async def write_gatt_char(self, characteristic, data, response=False):
+            assert events == ["connect", "notify"]
+            assert response is True
+            events.append("write")
+        async def disconnect(self):
+            self.is_connected = False
+            events.append("disconnect")
+
+    monkeypatch.setattr(bleak, "BleakClient", MockHub)
+
+    async def exercise():
+        async with hub_connection("mock") as client:
+            await Train(client, Settings(music_enabled=False)).lights(10)
+
+    asyncio.run(exercise())
+    assert events == ["connect", "notify", "write", "disconnect"]
