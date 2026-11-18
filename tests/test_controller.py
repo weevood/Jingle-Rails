@@ -56,6 +56,8 @@ def test_ble_cleanup_suppresses_eof(monkeypatch):
             self.is_connected = False
         async def connect(self):
             self.is_connected = True
+        async def start_notify(self, characteristic, callback):
+            self.notifications = (characteristic, callback)
         async def disconnect(self):
             self.is_connected = False
             raise EOFError("BlueZ bus closed")
@@ -67,3 +69,22 @@ def test_ble_cleanup_suppresses_eof(monkeypatch):
             assert client.is_connected
 
     asyncio.run(exercise())
+
+
+def test_lego_output_requests_gatt_acknowledgment():
+    client = FakeClient(True)
+    # FakeClient logs writes; actual GATT response flag must be True.
+    async def write_gatt_char(characteristic, data, response=False):
+        assert response is True
+        client.writes.append(bytes(data))
+    client.write_gatt_char = write_gatt_char
+    train = Train(client, Settings(music_enabled=False))
+    asyncio.run(train.lights(30))
+    assert client.writes[0] == bytes.fromhex("080081011151001e")
+
+
+def test_lego_feedback_parsing(caplog):
+    from jingle_rails.__main__ import hub_notification
+    with caplog.at_level("INFO", logger="jingle_rails"):
+        hub_notification(None, bytes.fromhex("0500820102"))
+    assert "Retour commande LEGO" in caplog.text
