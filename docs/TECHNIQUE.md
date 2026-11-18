@@ -109,3 +109,16 @@ Référence : [LEGO Wireless Protocol 3.x officiel](https://lego.github.io/lego-
 ### Validation matérielle des phares (18 novembre 2026)
 
 Après abonnement GATT et écritures avec accusé, le test réel `lights-test` a successivement accepté 10 %, 30 %, 10 %, 0 %, avec quatre retours LWP3 `(port=1, flags=0x0a)`. Le champ `0x0a` est un **bitfield de retour de commande**, et non la luminosité en pourcentage. La déconnexion à la fin de la session est attendue. Les 13 tests logiciels sur le Pi ont réussi. Prochaine étape : tester le moteur sur support avec roues libres ; ne pas activer le mode automatique tant que l'arrêt du moteur n'est pas validé.
+
+### Validation matérielle du scénario complet (18 novembre 2026)
+
+Sur Raspberry Pi 4 `piscreen`, Python 3.13, BlueZ 5.82 et Bleak 3.1.0 :
+
+- `lights-test` : quatre commandes de phares confirmées et retours de commande reçus.
+- `lap-test --seconds 2` : moteur effectivement en mouvement pendant deux secondes et arrêt confirmé physiquement lors de deux essais.
+- `test` : scénario d'un tour nominal de 15 s réalisé ; accélération et décélération clairement perceptibles ; aucun échec Bluetooth pendant le scénario. La fermeture BLE finale est attendue.
+- **Non encore vérifiés** : sens de rotation, durée réelle d'un tour sur les rails, arrêt au même emplacement, scénarios de l'heure et de la demi-heure en situation réelle, autonomie et exécution continue 7 h–22 h.
+
+Attention : le temps écoulé observé entre le départ du scénario et l'arrêt est légèrement supérieur aux 15 s nominaux, car les écritures GATT et les temporisations de la rampe ajoutent de la latence. Ne pas assimiler `seconds_per_lap=15` à une mesure précise du temps réel en circulation. Recalibrer sur circuit assemblé avant de démarrer le service automatique.
+
+La musique demeure désactivée dans la configuration locale en attendant une sortie audio.
