@@ -118,7 +118,12 @@ async def serve(mode, address, config, seconds, hour):
                 await train.stop()
                 if mode != "run":
                     try:
-                        if mode == "test":
+                        if mode == "lights-test":
+                            for brightness in (30, 100, 30, 0):
+                                LOG.info("Phares : %d %%", brightness)
+                                await train.lights(brightness)
+                                await asyncio.sleep(1)
+                        elif mode == "test":
                             await train.trip(1)
                         elif mode == "lap-test":
                             # Mesurer les secondes, sans modifier automatiquement la configuration.
@@ -171,7 +176,7 @@ async def serve(mode, address, config, seconds, hour):
 
 def main():
     parser = argparse.ArgumentParser(description="Jingle Rails — horloge ferroviaire de Noël")
-    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "music-test"))
+    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "music-test"))
     parser.add_argument("--config", type=Path, default=ROOT / "config.local.toml")
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--hour", type=int, default=3)
