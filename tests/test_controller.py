@@ -37,3 +37,11 @@ def test_shutdown_turns_off_motor_and_lights():
     assert len(client.writes) == 2
     assert client.writes[0][3] == 0 and client.writes[0][-1] == 0
     assert client.writes[1][3] == 1 and client.writes[1][-1] == 0
+
+
+def test_lights_only_cleanup_never_writes_motor():
+    client = FakeClient(True)
+    train = Train(client, Settings(music_enabled=False))
+    asyncio.run(train.safe_shutdown(stop_motor=False))
+    assert len(client.writes) == 1
+    assert client.writes[0][3] == 1 and client.writes[0][-1] == 0
