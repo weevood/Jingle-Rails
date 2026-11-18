@@ -132,3 +132,16 @@ Le mode `run` conserve déjà sa connexion GATT entre les animations. Nouvelle m
 Validation sans circuit : laisser le hub allumé, désactiver le service automatique puis lancer `python -m jingle_rails idle-test --minutes 15`. Confirmer que le voyant reste allumé et que le processus termine sans erreur. Pour une vraie autonomie, tester également après une nuit entière (avec le circuit posé et service en fonctionnement supervisé). Si le hub s'éteint malgré la connexion, le Raspberry ne peut pas le rallumer avec le firmware d'origine ; Pybricks ou une solution matérielle pourront être étudiés.
 
 Références : [documentation du protocole LEGO](https://lego.github.io/lego-ble-wireless-protocol-docs/) ; [pylgbst issue #125](https://github.com/undera/pylgbst/issues/125) décrivant des extinctions après ~10 minutes en Python malgré des exécutions plus longues avec l'application officielle.
+
+### Validation matérielle de l'inactivité avec interrogation batterie (18 novembre 2026)
+
+Essai sur le hub 88009 avec `idle-test --minutes 15` de **10:46:27 à 11:01:29** :
+
+- Notifications activées, connexion Bluetooth maintenue et voyant du hub allumé pendant les 15 minutes.
+- Requête batterie `05 00 01 06 05` toutes les 60 secondes, 15 réponses indiquant 100 %.
+- Aucune perte de connexion ni erreur pendant le test ; déconnexion normale à la fermeture du programme.
+- Aucun mouvement moteur ni allumage des phares demandé durant ce mode.
+- **Portée du résultat** : intervalle de 60 secondes validé sur 15 minutes seulement, pas encore validé plusieurs heures ni pendant une nuit. Le 100 % reporté par le hub n'est pas une mesure de capacité utile restante ni une estimation d'autonomie.
+- **Choix utilisateur confirmé** : préserver l'éclairage des phares à 30 % entre 17 h et 22 h dans le mode normal `run`.
+
+Prochaine étape : test longue durée du mode repos, puis calibration du circuit et validation du service automatique ; ne pas activer les horaires tant que les rails ne sont pas montés.
