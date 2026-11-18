@@ -84,3 +84,11 @@ La commande `lights-test` ne commande jamais le moteur. Lorsqu'un hub est décon
 - `ble-hold` restait connecté 20 s, mais la fermeture automatique de Bleak/BlueZ pouvait lever `EOFError`. `hub_connection` encapsule désormais l'ouverture et la fermeture et journalise spécifiquement cette erreur de nettoyage, sans masquer une erreur pendant l'envoi.
 - `lights-test` n'utilise provisoirement que 10 % et 30 % et trace `client.is_connected` après chaque écriture. Cela ne constitue **pas** une correction de l'origine de la déconnexion : il faut confirmer les résultats sur le hub.
 - Poursuivre avec piles récentes, aucune application LEGO connectée et service Jingle Rails désactivé. Tant que la liaison n'est pas stable, ne pas lancer le moteur.
+
+### Analyse du trafic HCI et mise à jour Bleak (18 novembre 2026)
+
+Une capture `btmon` a confirmé trois trames GATT écrites vers le port B : `080081011151000a` (10 %), `080081011151001e` (30 %), puis `080081011151000a` (10 %). La commande 0 % n'était pas visible dans cette capture. Le contrôleur du Pi a ensuite demandé la déconnexion HCI (`0x13`, puis événement `0x16`) ; ce fait ne prouve pas que la déconnexion est la cause plutôt qu'une conséquence de l'échec applicatif.
+
+Le Pi était sur Bleak 2.1.1 / dbus-fast 5.2.0 / BlueZ 5.82, Python 3.13. Les notes de Bleak **3.1.0 (2026-11-07)** indiquent un correctif explicite pour `disconnect()` levant un `EOFError` sur BlueZ. `requirements.txt` exige donc Bleak >=3.1,<4 ; une installation existante doit exécuter explicitement `.venv/bin/python -m pip install -r requirements-dev.txt` pour mettre le venv à jour, puisque le déploiement Git ne met pas les dépendances à jour automatiquement.
+
+Procédure : arrêter service et timer, faire le `git pull`, actualiser les dépendances, lancer `pytest`, puis `ble-hold` et enfin `lights-test` avec piles fiables. Ne pas activer la circulation automatique avant validation physique.
