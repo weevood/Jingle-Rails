@@ -7,6 +7,7 @@ motor_power = 55
 direction = 1              # -1 pour inverser le sens
 seconds_per_lap = 15.0     # À mesurer sur le circuit réel
 max_trip_seconds = 240.0
+keepalive_seconds = 60     # demande l'état batterie, connexion BLE maintenue au repos
 
 [schedule]
 start_hour = 7
