@@ -13,6 +13,21 @@ from .core import CHARACTERISTIC, Settings, idle_brightness, laps_at_hour, packe
 LOG = logging.getLogger("jingle_rails")
 ROOT = Path(__file__).resolve().parent.parent
 
+def hub_notification(_sender, data):
+    """Log LEGO LWP3 messages; feedback requires GATT notifications."""
+    payload = bytes(data)
+    if len(payload) < 3 or payload[0] != len(payload):
+        LOG.warning("Notification LEGO inattendue : %s", payload.hex(" "))
+        return
+    kind = payload[2]
+    if kind == 0x82:
+        feedback = [(payload[i], payload[i + 1]) for i in range(3, len(payload) - 1, 2)]
+        LOG.info("Retour commande LEGO (port, état) : %s", feedback)
+    elif kind in (0x02, 0x03, 0x05):
+        LOG.warning("Événement hub type=0x%02x : %s", kind, payload.hex(" "))
+    else:
+        LOG.debug("Hub event type=0x%02x : %s", kind, payload.hex(" "))
+
 
 def load_config(path: Path):
     data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -41,7 +56,8 @@ class Train:
         self.music = Music(config.music_enabled, config.music_volume)
 
     async def output(self, port, power):
-        await self.client.write_gatt_char(CHARACTERISTIC, packet(port, power), response=False)
+        # Wait for a GATT acknowledgement, distinct from LEGO command feedback.
+        await self.client.write_gatt_char(CHARACTERISTIC, packet(port, power), response=True)
 
     async def lights(self, level):
         await self.output(self.config.light_port, int(level))
@@ -130,6 +146,9 @@ async def hub_connection(address):
     )
     await client.connect()
     try:
+        # 0x11 output flags request feedback through asynchronous notifications.
+        await client.start_notify(CHARACTERISTIC, hub_notification)
+        LOG.info("Notifications LEGO activées")
         yield client
     finally:
         try:
