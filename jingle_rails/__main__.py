@@ -22,7 +22,10 @@ def hub_notification(_sender, data):
     kind = payload[2]
     if kind == 0x82:
         feedback = [(payload[i], payload[i + 1]) for i in range(3, len(payload) - 1, 2)]
-        LOG.info("Retour commande LEGO (port, état) : %s", feedback)
+        LOG.info(
+            "Retour commande LEGO (port, flags d’état hexadécimaux) : %s",
+            [(port, f"0x{flags:02x}") for port, flags in feedback],
+        )
     elif kind in (0x02, 0x03, 0x05):
         LOG.warning("Événement hub type=0x%02x : %s", kind, payload.hex(" "))
     else:
