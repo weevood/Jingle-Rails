@@ -1,0 +1,8 @@
+[Unit]
+Description=Jingle Rails - vérification des nouvelles versions
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/Jingle-Rails
+ExecStart=/bin/bash /home/pi/Jingle-Rails/scripts/deploy.sh
