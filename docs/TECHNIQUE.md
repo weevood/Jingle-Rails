@@ -74,7 +74,13 @@ Si `lights-test` termine sur `org.bluez.Error.Failed: Not connected` et que le v
 1. Désactiver le service automatique pour qu'il ne monopolise pas le hub.
 2. Vérifier les piles et fermer les autres contrôleurs LEGO.
 3. Redémarrer le hub, puis lancer `python -m jingle_rails ble-hold` : le programme maintient une connexion pendant 20 secondes **sans envoyer aucune commande aux ports** et vérifie la stabilité.
-4. Si ce test réussit, lancer `lights-test` : séquence 30 %, 100 %, 30 %, 0 % sur le port d'éclairage seulement.
+4. Si ce test réussit, lancer `lights-test` : séquence prudente 10 %, 30 %, 10 %, 0 % sur le port d'éclairage seulement.
 5. Comparer le résultat. Une déconnexion pendant `ble-hold` indique que le problème n'est pas lié aux commandes d'éclairage. Une déconnexion uniquement sous `lights-test` justifie de vérifier les piles, les accessoires et les trames/événements BLE.
 
 La commande `lights-test` ne commande jamais le moteur. Lorsqu'un hub est déconnecté, le programme journalise qu'un arrêt ne peut pas être garanti plutôt que d'empiler les erreurs. Aucun comportement du hub n'est garanti tant que les tests physiques n'ont pas été validés.
+
+### Correctif du 18 novembre — diagnostic distinct des deux erreurs
+
+- `ble-hold` restait connecté 20 s, mais la fermeture automatique de Bleak/BlueZ pouvait lever `EOFError`. `hub_connection` encapsule désormais l'ouverture et la fermeture et journalise spécifiquement cette erreur de nettoyage, sans masquer une erreur pendant l'envoi.
+- `lights-test` n'utilise provisoirement que 10 % et 30 % et trace `client.is_connected` après chaque écriture. Cela ne constitue **pas** une correction de l'origine de la déconnexion : il faut confirmer les résultats sur le hub.
+- Poursuivre avec piles récentes, aucune application LEGO connectée et service Jingle Rails désactivé. Tant que la liaison n'est pas stable, ne pas lancer le moteur.
