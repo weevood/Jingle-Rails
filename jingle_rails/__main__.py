@@ -19,7 +19,7 @@ def load_config(path: Path):
     config = Settings(
         start_hour=int(schedule.get("start_hour", 7)),
         end_hour=int(schedule.get("end_hour", 22)),
-        seconds_per_lap=float(train.get("seconds_per_lap", 12)),
+        seconds_per_lap=float(train.get("seconds_per_lap", 15)),
         motor_power=int(train.get("motor_power", 55)),
         direction=int(train.get("direction", 1)),
         motor_port=int(train.get("motor_port", 0)),
