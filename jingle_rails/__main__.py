@@ -51,6 +51,18 @@ class Train:
     async def stop(self):
         await self.motor(0)
 
+    async def safe_shutdown(self):
+        """Best effort: never mask the real BLE failure with cleanup errors."""
+        await self.music.stop()
+        if not self.client.is_connected:
+            LOG.warning("Hub déconnecté : arrêt moteur non transmissible ; vérifier physiquement le train")
+            return
+        for label, action in (("moteur", self.stop), ("phares", lambda: self.lights(0))):
+            try:
+                await action()
+            except Exception as exc:
+                LOG.warning("Arrêt %s non confirmé (%s). Vérifier le hub.", label, exc)
+
     async def trip(self, laps):
         duration = trip_duration(laps, self.config)
         LOG.info("Départ : %d tour(s), %.1f s", laps, duration)
@@ -113,16 +125,21 @@ async def serve(mode, address, config, seconds, hour):
     while True:
         train = None
         try:
-            async with BleakClient(address, timeout=20) as client:
+            async with BleakClient(
+                address, timeout=20,
+                disconnected_callback=lambda _client: LOG.warning("Signal BLE : hub déconnecté"),
+            ) as client:
                 train = Train(client, config)
-                await train.stop()
+                LOG.info("Hub connecté (%s)", mode)
+                if mode != "lights-test":
+                    await train.stop()
                 if mode != "run":
                     try:
                         if mode == "lights-test":
                             for brightness in (30, 100, 30, 0):
                                 LOG.info("Phares : %d %%", brightness)
                                 await train.lights(brightness)
-                                await asyncio.sleep(1)
+                                await asyncio.sleep(2)
                         elif mode == "test":
                             await train.trip(1)
                         elif mode == "lap-test":
@@ -133,9 +150,7 @@ async def serve(mode, address, config, seconds, hour):
                         elif mode == "hour-test":
                             await train.show("hour", hour)
                     finally:
-                        await train.stop()
-                        await train.music.stop()
-                        await train.lights(0)
+                        await train.safe_shutdown()
                     return
                 LOG.info("Connecté, programme %02d:00–%02d:00", config.start_hour, config.end_hour)
                 last_light = None
@@ -162,13 +177,7 @@ async def serve(mode, address, config, seconds, hour):
                 raise
         finally:
             if train is not None:
-                await train.music.stop()
-                if train.client.is_connected:
-                    try:
-                        await train.stop()
-                        await train.lights(0)
-                    except Exception:
-                        LOG.error("Arrêt BLE non confirmé ! Vérifier physiquement le train")
+                await train.safe_shutdown()
         if mode != "run":
             return
         await asyncio.sleep(8)
