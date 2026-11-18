@@ -49,7 +49,7 @@ Place le train sur un circuit dégagé, sous surveillance :
 .venv/bin/python -m jingle_rails hour-test --hour 3
 ```
 
-Le test de 5 secondes aide à évaluer le temps nécessaire à un tour. Il ne modifie pas la calibration automatiquement. La durée maximale d'un trajet est limitée à 240 secondes par défaut.
+Le test de 5 secondes aide à évaluer le temps nécessaire à un tour. Il ne modifie pas la calibration automatiquement. Avec 15 secondes par tour provisoirement, le trajet le plus long (12 tours) dure environ 180 secondes. La durée maximale d'un trajet est limitée à 240 secondes par défaut.
 
 ### Démarrer le service
 
