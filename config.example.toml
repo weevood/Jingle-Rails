@@ -1,0 +1,19 @@
+# Copier vers config.local.toml (ignoré par Git). Ne jamais publier l'adresse du hub.
+[train]
+hub_address = ""
+motor_port = 0             # A=0, B=1
+light_port = 1             # Ici moteur A, éclairage B
+motor_power = 55
+direction = 1              # -1 pour inverser le sens
+seconds_per_lap = 12.0     # À mesurer sur le circuit réel
+max_trip_seconds = 240.0
+
+[schedule]
+start_hour = 7
+end_hour = 22              # dernier départ à 22:00; dernier :30 à 21:30
+evening_start = 17
+idle_evening_brightness = 30
+
+[audio]
+music_enabled = true
+music_volume = 0.35        # entre 0 et 1
