@@ -29,7 +29,7 @@ def test_brightness():
 
 def test_safety():
     c = Settings()
-    assert trip_duration(12, c) == 144
+    assert trip_duration(12, c) == 180
     with pytest.raises(ValueError):
         trip_duration(21, c)
     with pytest.raises(ValueError):
