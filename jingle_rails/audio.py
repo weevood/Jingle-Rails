@@ -1,5 +1,6 @@
 """Petite mélodie ORIGINALE de Noël, synthétisée localement (aucun fichier tiers)."""
 import asyncio
+import contextlib
 import logging
 import math
 import os
@@ -37,6 +38,7 @@ class Music:
         self.volume = volume
         self.process = None
         self.file = None
+        self.task = None
 
     async def start(self):
         player = shutil.which("aplay")
@@ -48,16 +50,22 @@ class Music:
         fd, path = tempfile.mkstemp(prefix="jingle-rails-", suffix=".wav")
         os.close(fd)
         self.file = path
-        make_wav(path, self.volume, repeats=8)
-        try:
-            self.process = await asyncio.create_subprocess_exec(
-                player, "-q", path, stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL)
-        except OSError:
-            LOG.exception("Impossible de jouer la musique")
-            await self.stop()
+        make_wav(path, self.volume, repeats=2)
+        async def play_loop():
+            while True:
+                self.process = await asyncio.create_subprocess_exec(
+                    player, "-q", path, stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL)
+                result = await self.process.wait()
+                if result != 0:
+                    LOG.warning("Lecture audio impossible (aplay code %s)", result)
+                    return
+
+        self.task = asyncio.create_task(play_loop())
 
     async def stop(self):
+        if self.task:
+            self.task.cancel()
         if self.process and self.process.returncode is None:
             self.process.terminate()
             try:
@@ -65,6 +73,10 @@ class Music:
             except asyncio.TimeoutError:
                 self.process.kill()
                 await self.process.wait()
+        if self.task:
+            with contextlib.suppress(asyncio.CancelledError):
+                await self.task
+        self.task = None
         self.process = None
         if self.file:
             try:
