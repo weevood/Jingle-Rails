@@ -1,0 +1,17 @@
+[Unit]
+Description=Jingle Rails - train de Noël LEGO
+After=bluetooth.target sound.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Jingle-Rails
+ExecStart=/home/pi/Jingle-Rails/.venv/bin/python -m jingle_rails run
+Restart=always
+RestartSec=8
+TimeoutStopSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
