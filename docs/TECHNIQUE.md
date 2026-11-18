@@ -105,3 +105,7 @@ Procédure : arrêter service et timer, faire le `git pull`, actualiser les dép
 **Hypothèse encore à confirmer :** ce protocole de connexion incomplet explique la déconnexion répétée après la première commande. Il faut valider sur le 88009 réel ; les tests unitaires ne simulent pas la radio.
 
 Référence : [LEGO Wireless Protocol 3.x officiel](https://lego.github.io/lego-ble-wireless-protocol-docs/) — « LEGO Specific GATT Service », « Startup and Completion Information » et « Port Output Command Feedback ».
+
+### Validation matérielle des phares (18 novembre 2026)
+
+Après abonnement GATT et écritures avec accusé, le test réel `lights-test` a successivement accepté 10 %, 30 %, 10 %, 0 %, avec quatre retours LWP3 `(port=1, flags=0x0a)`. Le champ `0x0a` est un **bitfield de retour de commande**, et non la luminosité en pourcentage. La déconnexion à la fin de la session est attendue. Les 13 tests logiciels sur le Pi ont réussi. Prochaine étape : tester le moteur sur support avec roues libres ; ne pas activer le mode automatique tant que l'arrêt du moteur n'est pas validé.
