@@ -1,6 +1,7 @@
 """Application Jingle Rails : BLE, scénarios, horaires et arrêt de sécurité."""
 import argparse
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
 from pathlib import Path
@@ -119,18 +120,33 @@ async def scan():
             print(f"{device.name or 'Hub'} : {device.address}")
 
 
-async def serve(mode, address, config, seconds, hour):
+@asynccontextmanager
+async def hub_connection(address):
+    """Release BlueZ even if its D-Bus socket closes during disconnect."""
     from bleak import BleakClient
+    client = BleakClient(
+        address, timeout=20,
+        disconnected_callback=lambda _client: LOG.warning("Signal BLE : hub déconnecté"),
+    )
+    await client.connect()
+    try:
+        yield client
+    finally:
+        try:
+            await client.disconnect()
+        except (EOFError, OSError) as exc:
+            LOG.warning("Fermeture BlueZ interrompue (%s) : pas une erreur de commande LEGO", exc)
+
+
+async def serve(mode, address, config, seconds, hour):
     if not address:
         raise SystemExit("hub_address manquant dans config.local.toml ; exécuter 'scan'")
     last_slot = None
     while True:
         train = None
+        cleaned = False
         try:
-            async with BleakClient(
-                address, timeout=20,
-                disconnected_callback=lambda _client: LOG.warning("Signal BLE : hub déconnecté"),
-            ) as client:
+            async with hub_connection(address) as client:
                 train = Train(client, config)
                 LOG.info("Hub connecté (%s)", mode)
                 if mode not in ("lights-test", "ble-hold"):
@@ -142,9 +158,10 @@ async def serve(mode, address, config, seconds, hour):
                             await asyncio.sleep(20)
                             LOG.info("État après 20 s : %s", "connecté" if client.is_connected else "déconnecté")
                         elif mode == "lights-test":
-                            for brightness in (30, 100, 30, 0):
+                            for brightness in (10, 30, 10, 0):
                                 LOG.info("Phares : %d %%", brightness)
                                 await train.lights(brightness)
+                                LOG.info("Écriture acceptée ; connecté=%s", client.is_connected)
                                 await asyncio.sleep(2)
                         elif mode == "test":
                             await train.trip(1)
@@ -160,6 +177,7 @@ async def serve(mode, address, config, seconds, hour):
                             await train.music.stop()
                         else:
                             await train.safe_shutdown(stop_motor=(mode != "lights-test"))
+                        cleaned = True
                     return
                 LOG.info("Connecté, programme %02d:00–%02d:00", config.start_hour, config.end_hour)
                 last_light = None
@@ -185,7 +203,7 @@ async def serve(mode, address, config, seconds, hour):
             if mode != "run":
                 raise
         finally:
-            if train is not None:
+            if train is not None and not cleaned:
                 if mode == "ble-hold":
                     await train.music.stop()
                 else:
