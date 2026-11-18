@@ -92,3 +92,16 @@ Une capture `btmon` a confirmé trois trames GATT écrites vers le port B : `080
 Le Pi était sur Bleak 2.1.1 / dbus-fast 5.2.0 / BlueZ 5.82, Python 3.13. Les notes de Bleak **3.1.0 (2026-11-07)** indiquent un correctif explicite pour `disconnect()` levant un `EOFError` sur BlueZ. `requirements.txt` exige donc Bleak >=3.1,<4 ; une installation existante doit exécuter explicitement `.venv/bin/python -m pip install -r requirements-dev.txt` pour mettre le venv à jour, puisque le déploiement Git ne met pas les dépendances à jour automatiquement.
 
 Procédure : arrêter service et timer, faire le `git pull`, actualiser les dépendances, lancer `pytest`, puis `ble-hold` et enfin `lights-test` avec piles fiables. Ne pas activer la circulation automatique avant validation physique.
+
+### Révision du contrôleur LWP3 (18 novembre 2026)
+
+**Défaut de notre implémentation identifié :** les commandes port output portaient le byte `0x11` (« execute immediately + command feedback »), mais le contrôleur ne s'abonnait pas aux notifications de la caractéristique LEGO. Il ne pouvait donc pas recevoir les retours du hub `0x82` ni les éventuels événements d'erreur `0x05`.
+
+- Correction : `BleakClient.start_notify(CHARACTERISTIC, hub_notification)` après connexion et avant toute commande de port.
+- Correction : `write_gatt_char(..., response=True)` au lieu des écritures sans réponse, la caractéristique annonçant bien le support GATT Write et le document officiel LEGO décrivant l'usage de Write With Response dans son profil 3.x. L'accusé GATT ne doit pas être confondu avec le retour LWP3 `0x82`.
+- Les notifications de commande et les erreurs du hub sont maintenant journalisées.
+- La trame `08 00 81 01 11 51 00 VV` elle-même était valide pour la lumière branchée sur le port B.
+
+**Hypothèse encore à confirmer :** ce protocole de connexion incomplet explique la déconnexion répétée après la première commande. Il faut valider sur le 88009 réel ; les tests unitaires ne simulent pas la radio.
+
+Référence : [LEGO Wireless Protocol 3.x officiel](https://lego.github.io/lego-ble-wireless-protocol-docs/) — « LEGO Specific GATT Service », « Startup and Completion Information » et « Port Output Command Feedback ».
