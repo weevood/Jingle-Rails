@@ -17,12 +17,15 @@ class Settings:
     max_trip_seconds: float = 240.0
     evening_start: int = 17
     idle_evening_brightness: int = 30
+    keepalive_seconds: int = 60
     music_enabled: bool = True
     music_volume: float = 0.35
 
     def validate(self):
         if not 0 <= self.start_hour <= self.end_hour <= 23:
             raise ValueError("Horaires invalides")
+        if self.keepalive_seconds < 10 or self.keepalive_seconds > 300:
+            raise ValueError("Intervalle de maintien BLE hors limites (10–300 s)")
         if self.seconds_per_lap <= 0 or self.max_trip_seconds <= 0:
             raise ValueError("Durées invalides")
         if self.motor_power not in range(1, 101) or self.direction not in (-1, 1):
@@ -58,3 +61,8 @@ def trip_duration(laps: int, config: Settings) -> float:
     if not 0 < duration <= config.max_trip_seconds:
         raise ValueError("Trajet trop long; réduire la durée d'un tour ou relever le plafond après vérification")
     return duration
+
+
+def battery_request() -> bytes:
+    """LWP3 Hub Property Request Update: battery level (0x06), op 0x05."""
+    return bytes([5, 0, 0x01, 0x06, 0x05])
