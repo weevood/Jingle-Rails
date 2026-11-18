@@ -45,3 +45,25 @@ def test_lights_only_cleanup_never_writes_motor():
     asyncio.run(train.safe_shutdown(stop_motor=False))
     assert len(client.writes) == 1
     assert client.writes[0][3] == 1 and client.writes[0][-1] == 0
+
+
+def test_ble_cleanup_suppresses_eof(monkeypatch):
+    import bleak
+    from jingle_rails.__main__ import hub_connection
+
+    class FakeBleakClient:
+        def __init__(self, *_args, **_kwargs):
+            self.is_connected = False
+        async def connect(self):
+            self.is_connected = True
+        async def disconnect(self):
+            self.is_connected = False
+            raise EOFError("BlueZ bus closed")
+
+    monkeypatch.setattr(bleak, "BleakClient", FakeBleakClient)
+
+    async def exercise():
+        async with hub_connection("mock") as client:
+            assert client.is_connected
+
+    asyncio.run(exercise())
