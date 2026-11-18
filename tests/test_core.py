@@ -34,3 +34,12 @@ def test_safety():
         trip_duration(21, c)
     with pytest.raises(ValueError):
         Settings(motor_port=0, light_port=0).validate()
+
+def test_battery_request_and_keepalive_validation():
+    from jingle_rails.core import battery_request
+    assert battery_request() == bytes.fromhex("0500010605")
+    Settings(keepalive_seconds=60).validate()
+    with pytest.raises(ValueError):
+        Settings(keepalive_seconds=5).validate()
+    with pytest.raises(ValueError):
+        Settings(keepalive_seconds=301).validate()
