@@ -4,11 +4,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
+import time
 from pathlib import Path
 import tomllib
 
 from .audio import Music
-from .core import CHARACTERISTIC, Settings, idle_brightness, laps_at_hour, packet, scheduled_event, trip_duration
+from .core import CHARACTERISTIC, Settings, battery_request, idle_brightness, laps_at_hour, packet, scheduled_event, trip_duration
 
 LOG = logging.getLogger("jingle_rails")
 ROOT = Path(__file__).resolve().parent.parent
@@ -20,7 +21,9 @@ def hub_notification(_sender, data):
         LOG.warning("Notification LEGO inattendue : %s", payload.hex(" "))
         return
     kind = payload[2]
-    if kind == 0x82:
+    if kind == 0x01 and len(payload) >= 6 and payload[3:5] == bytes((0x06, 0x06)):
+        LOG.info("Batterie LEGO : %d %%", payload[5])
+    elif kind == 0x82:
         feedback = [(payload[i], payload[i + 1]) for i in range(3, len(payload) - 1, 2)]
         LOG.info(
             "Retour commande LEGO (port, flags d’état hexadécimaux) : %s",
@@ -46,6 +49,7 @@ def load_config(path: Path):
         max_trip_seconds=float(train.get("max_trip_seconds", 240)),
         evening_start=int(schedule.get("evening_start", 17)),
         idle_evening_brightness=int(schedule.get("idle_evening_brightness", 30)),
+        keepalive_seconds=int(train.get("keepalive_seconds", 60)),
         music_enabled=bool(audio.get("music_enabled", True)),
         music_volume=float(audio.get("music_volume", .35)),
     )
@@ -61,6 +65,10 @@ class Train:
     async def output(self, port, power):
         # Wait for a GATT acknowledgement, distinct from LEGO command feedback.
         await self.client.write_gatt_char(CHARACTERISTIC, packet(port, power), response=True)
+
+    async def poll_battery(self):
+        """LWP3 standard query, not a motor command; may help avoid idle sleep."""
+        await self.client.write_gatt_char(CHARACTERISTIC, battery_request(), response=True)
 
     async def lights(self, level):
         await self.output(self.config.light_port, int(level))
@@ -160,7 +168,7 @@ async def hub_connection(address):
             LOG.warning("Fermeture BlueZ interrompue (%s) : pas une erreur de commande LEGO", exc)
 
 
-async def serve(mode, address, config, seconds, hour):
+async def serve(mode, address, config, seconds, hour, minutes=15):
     if not address:
         raise SystemExit("hub_address manquant dans config.local.toml ; exécuter 'scan'")
     last_slot = None
@@ -171,11 +179,18 @@ async def serve(mode, address, config, seconds, hour):
             async with hub_connection(address) as client:
                 train = Train(client, config)
                 LOG.info("Hub connecté (%s)", mode)
-                if mode not in ("lights-test", "ble-hold"):
+                if mode not in ("lights-test", "ble-hold", "idle-test"):
                     await train.stop()
                 if mode != "run":
                     try:
-                        if mode == "ble-hold":
+                        if mode == "idle-test":
+                            LOG.info("Test au repos : %.1f minutes, interrogation batterie chaque %d s", minutes, config.keepalive_seconds)
+                            end_at = time.monotonic() + minutes * 60
+                            while time.monotonic() < end_at:
+                                await train.poll_battery()
+                                LOG.info("Connexion au repos : %s", client.is_connected)
+                                await asyncio.sleep(min(config.keepalive_seconds, max(0, end_at - time.monotonic())))
+                        elif mode == "ble-hold":
                             LOG.info("Test de stabilité BLE : connexion maintenue 20 s sans commande")
                             await asyncio.sleep(20)
                             LOG.info("État après 20 s : %s", "connecté" if client.is_connected else "déconnecté")
@@ -195,7 +210,7 @@ async def serve(mode, address, config, seconds, hour):
                         elif mode == "hour-test":
                             await train.show("hour", hour)
                     finally:
-                        if mode == "ble-hold":
+                        if mode in ("ble-hold", "idle-test"):
                             await train.music.stop()
                         else:
                             await train.safe_shutdown(stop_motor=(mode != "lights-test"))
@@ -203,8 +218,12 @@ async def serve(mode, address, config, seconds, hour):
                     return
                 LOG.info("Connecté, programme %02d:00–%02d:00", config.start_hour, config.end_hour)
                 last_light = None
+                next_keepalive = time.monotonic()
                 while client.is_connected:
                     now = datetime.now().astimezone()
+                    if time.monotonic() >= next_keepalive:
+                        await train.poll_battery()
+                        next_keepalive = time.monotonic() + config.keepalive_seconds
                     brightness = idle_brightness(now, config)
                     if brightness != last_light:
                         await train.lights(brightness)
@@ -226,7 +245,7 @@ async def serve(mode, address, config, seconds, hour):
                 raise
         finally:
             if train is not None and not cleaned:
-                if mode == "ble-hold":
+                if mode in ("ble-hold", "idle-test"):
                     await train.music.stop()
                 else:
                     await train.safe_shutdown(stop_motor=(mode != "lights-test"))
@@ -237,10 +256,11 @@ async def serve(mode, address, config, seconds, hour):
 
 def main():
     parser = argparse.ArgumentParser(description="Jingle Rails — horloge ferroviaire de Noël")
-    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "ble-hold", "music-test"))
+    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "ble-hold", "idle-test", "music-test"))
     parser.add_argument("--config", type=Path, default=ROOT / "config.local.toml")
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--hour", type=int, default=3)
+    parser.add_argument("--minutes", type=float, default=15, help="Durée idle-test, 1–120 minutes")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.mode == "scan":
@@ -259,10 +279,12 @@ def main():
         return
     if args.mode == "lap-test" and not 0 < args.seconds <= config.max_trip_seconds:
         parser.error("--seconds doit être strictement positif et rester sous max_trip_seconds")
+    if args.mode == "idle-test" and not 1 <= args.minutes <= 120:
+        parser.error("--minutes doit être entre 1 et 120")
     if args.mode == "hour-test" and not 0 <= args.hour <= 23:
         parser.error("--hour doit être entre 0 et 23")
     try:
-        asyncio.run(serve(args.mode, address, config, args.seconds, args.hour))
+        asyncio.run(serve(args.mode, address, config, args.seconds, args.hour, args.minutes))
     except KeyboardInterrupt:
         LOG.info("Interruption demandée; vérifier que le train est arrêté")
 
