@@ -51,13 +51,15 @@ class Train:
     async def stop(self):
         await self.motor(0)
 
-    async def safe_shutdown(self):
+    async def safe_shutdown(self, *, stop_motor=True):
         """Best effort: never mask the real BLE failure with cleanup errors."""
         await self.music.stop()
         if not self.client.is_connected:
             LOG.warning("Hub déconnecté : arrêt moteur non transmissible ; vérifier physiquement le train")
             return
-        for label, action in (("moteur", self.stop), ("phares", lambda: self.lights(0))):
+        actions = [("moteur", self.stop)] if stop_motor else []
+        actions.append(("phares", lambda: self.lights(0)))
+        for label, action in actions:
             try:
                 await action()
             except Exception as exc:
@@ -131,11 +133,15 @@ async def serve(mode, address, config, seconds, hour):
             ) as client:
                 train = Train(client, config)
                 LOG.info("Hub connecté (%s)", mode)
-                if mode != "lights-test":
+                if mode not in ("lights-test", "ble-hold"):
                     await train.stop()
                 if mode != "run":
                     try:
-                        if mode == "lights-test":
+                        if mode == "ble-hold":
+                            LOG.info("Test de stabilité BLE : connexion maintenue 20 s sans commande")
+                            await asyncio.sleep(20)
+                            LOG.info("État après 20 s : %s", "connecté" if client.is_connected else "déconnecté")
+                        elif mode == "lights-test":
                             for brightness in (30, 100, 30, 0):
                                 LOG.info("Phares : %d %%", brightness)
                                 await train.lights(brightness)
@@ -150,7 +156,10 @@ async def serve(mode, address, config, seconds, hour):
                         elif mode == "hour-test":
                             await train.show("hour", hour)
                     finally:
-                        await train.safe_shutdown()
+                        if mode == "ble-hold":
+                            await train.music.stop()
+                        else:
+                            await train.safe_shutdown(stop_motor=(mode != "lights-test"))
                     return
                 LOG.info("Connecté, programme %02d:00–%02d:00", config.start_hour, config.end_hour)
                 last_light = None
@@ -177,7 +186,10 @@ async def serve(mode, address, config, seconds, hour):
                 raise
         finally:
             if train is not None:
-                await train.safe_shutdown()
+                if mode == "ble-hold":
+                    await train.music.stop()
+                else:
+                    await train.safe_shutdown(stop_motor=(mode != "lights-test"))
         if mode != "run":
             return
         await asyncio.sleep(8)
@@ -185,7 +197,7 @@ async def serve(mode, address, config, seconds, hour):
 
 def main():
     parser = argparse.ArgumentParser(description="Jingle Rails — horloge ferroviaire de Noël")
-    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "music-test"))
+    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "ble-hold", "music-test"))
     parser.add_argument("--config", type=Path, default=ROOT / "config.local.toml")
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--hour", type=int, default=3)
