@@ -15,7 +15,7 @@ LEGO Powered Up 88009 ; caractéristique GATT `00001624-1212-efde-1623-785feabcd
 
 Trame `08 00 81 PP 11 51 00 VV` : port output (0x81), WriteDirectModeData (0x51), port `PP` (A=0, B=1), niveau signé `VV` en mode 0 ; zéro arrête le moteur. Source : [protocole officiel LEGO](https://lego.github.io/lego-ble-wireless-protocol-docs/).
 
-Le moteur LEGO 88011 **ne donne pas de distance de trajet ni de nombre de tours**. Un tour est estimé par le temps `seconds_per_lap` ; le train peut dériver de son point d'arrêt avec l'usure des piles. Il faut surveiller le dispositif.
+Le moteur LEGO 88011 **ne donne pas de distance de trajet ni de nombre de tours**. Un tour est estimé par le temps `seconds_per_lap` (15 secondes provisoirement, avant calibration) ; le train peut dériver de son point d'arrêt avec l'usure des piles. Il faut surveiller le dispositif.
 
 ## Comportement de l'horloge
 
