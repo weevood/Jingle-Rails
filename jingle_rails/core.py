@@ -9,7 +9,7 @@ CHARACTERISTIC = "00001624-1212-efde-1623-785feabcd123"
 class Settings:
     start_hour: int = 7
     end_hour: int = 22
-    seconds_per_lap: float = 12.0
+    seconds_per_lap: float = 15.0
     motor_power: int = 55
     direction: int = 1
     motor_port: int = 0
