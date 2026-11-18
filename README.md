@@ -51,6 +51,20 @@ Place le train sur un circuit dégagé, sous surveillance :
 
 Le test de 5 secondes aide à évaluer le temps nécessaire à un tour. Il ne modifie pas la calibration automatiquement. Avec 15 secondes par tour provisoirement, le trajet le plus long (12 tours) dure environ 180 secondes. La durée maximale d'un trajet est limitée à 240 secondes par défaut.
 
+
+### Le hub doit-il être rallumé chaque matin ?
+
+Non, **si le hub reste allumé et la connexion Bluetooth maintenue**. Le Raspberry conserve la connexion même la nuit (aucune circulation entre 22 h et 7 h). Il demande régulièrement le niveau de batterie du hub (`keepalive_seconds = 60`) pour tester un maintien en éveil, sans commander le moteur. Il s'agit d'une **hypothèse à vérifier sur le matériel**, pas d'une garantie officielle LEGO. Un hub complètement éteint ne peut pas être réveillé par Bluetooth avec son firmware d'origine.
+
+Sans circuit, tester pendant 15 minutes :
+
+```bash
+sudo systemctl stop jingle-rails.service jingle-rails-update.timer
+.venv/bin/python -m jingle_rails idle-test --minutes 15
+```
+
+Le test doit afficher les réponses batterie et confirmer une connexion toujours active. Si le hub s'éteint, consulter [la documentation technique](docs/TECHNIQUE.md) : aucune commande de réveil à distance ne peut alors être envoyée.
+
 ### Démarrer le service
 
 ```bash
