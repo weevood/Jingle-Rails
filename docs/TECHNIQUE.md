@@ -122,3 +122,13 @@ Sur Raspberry Pi 4 `piscreen`, Python 3.13, BlueZ 5.82 et Bleak 3.1.0 :
 Attention : le temps écoulé observé entre le départ du scénario et l'arrêt est légèrement supérieur aux 15 s nominaux, car les écritures GATT et les temporisations de la rampe ajoutent de la latence. Ne pas assimiler `seconds_per_lap=15` à une mesure précise du temps réel en circulation. Recalibrer sur circuit assemblé avant de démarrer le service automatique.
 
 La musique demeure désactivée dans la configuration locale en attendant une sortie audio.
+
+### Maintien du hub éveillé entre les horaires (18 novembre 2026)
+
+Le problème de l'allumage manuel est distinct de l'ordonnancement. Avec son firmware LEGO, un hub éteint **ne peut pas être réveillé à distance par BLE**. La connexion doit donc rester ouverte 24 h/24, avec moteur coupé la nuit.
+
+Le mode `run` conserve déjà sa connexion GATT entre les animations. Nouvelle mesure expérimentale : toutes les 60 secondes, envoyer une requête standard **Hub Property / Battery Voltage / Request Update** : `05 00 01 06 05`. La propriété et la requête sont documentées officiellement dans LEGO Wireless Protocol 3.0 ; **leur efficacité comme keepalive n'est pas garantie** par LEGO. Les notifications en retour sont décodées si disponibles. Aucun ordre moteur ou lumière n'est envoyé par ce mécanisme.
+
+Validation sans circuit : laisser le hub allumé, désactiver le service automatique puis lancer `python -m jingle_rails idle-test --minutes 15`. Confirmer que le voyant reste allumé et que le processus termine sans erreur. Pour une vraie autonomie, tester également après une nuit entière (avec le circuit posé et service en fonctionnement supervisé). Si le hub s'éteint malgré la connexion, le Raspberry ne peut pas le rallumer avec le firmware d'origine ; Pybricks ou une solution matérielle pourront être étudiés.
+
+Références : [documentation du protocole LEGO](https://lego.github.io/lego-ble-wireless-protocol-docs/) ; [pylgbst issue #125](https://github.com/undera/pylgbst/issues/125) décrivant des extinctions après ~10 minutes en Python malgré des exécutions plus longues avec l'application officielle.
