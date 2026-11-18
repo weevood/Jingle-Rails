@@ -88,6 +88,7 @@ def test_lego_feedback_parsing(caplog):
     with caplog.at_level("INFO", logger="jingle_rails"):
         hub_notification(None, bytes.fromhex("0500820102"))
     assert "Retour commande LEGO" in caplog.text
+    assert "0x02" in caplog.text
 
 
 def test_subscription_before_first_command(monkeypatch):
