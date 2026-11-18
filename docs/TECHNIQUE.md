@@ -66,3 +66,15 @@ Capteur de passage pour compter réellement les tours ; interface web locale ; d
 ## Journal de décisions
 
 2026-11-18 : dépôt public `Jingle-Rails`. Horloge de 7 h à 22 h, animations aux heures et demi-heures, mélodie originale sur Raspberry, paramètres locaux non publiés et déploiement par `systemd` après tests.
+
+## Diagnostic BLE : hub qui s'éteint
+
+Si `lights-test` termine sur `org.bluez.Error.Failed: Not connected` et que le voyant du hub clignote puis s'éteint :
+
+1. Désactiver le service automatique pour qu'il ne monopolise pas le hub.
+2. Vérifier les piles et fermer les autres contrôleurs LEGO.
+3. Redémarrer le hub, puis lancer `python -m jingle_rails ble-hold` : le programme maintient une connexion pendant 20 secondes **sans envoyer aucune commande aux ports** et vérifie la stabilité.
+4. Si ce test réussit, lancer `lights-test` : séquence 30 %, 100 %, 30 %, 0 % sur le port d'éclairage seulement.
+5. Comparer le résultat. Une déconnexion pendant `ble-hold` indique que le problème n'est pas lié aux commandes d'éclairage. Une déconnexion uniquement sous `lights-test` justifie de vérifier les piles, les accessoires et les trames/événements BLE.
+
+La commande `lights-test` ne commande jamais le moteur. Lorsqu'un hub est déconnecté, le programme journalise qu'un arrêt ne peut pas être garanti plutôt que d'empiler les erreurs. Aucun comportement du hub n'est garanti tant que les tests physiques n'ont pas été validés.
