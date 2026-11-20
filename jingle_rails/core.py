@@ -10,7 +10,8 @@ class Settings:
     start_hour: int = 7
     end_hour: int = 22
     seconds_per_lap: float = 15.0
-    motor_power: int = 55
+    motor_power: int = 40
+    ramp_seconds: float = 3.0
     direction: int = 1
     motor_port: int = 0
     light_port: int = 1
@@ -26,6 +27,8 @@ class Settings:
             raise ValueError("Horaires invalides")
         if self.keepalive_seconds < 10 or self.keepalive_seconds > 300:
             raise ValueError("Intervalle de maintien BLE hors limites (10–300 s)")
+        if self.ramp_seconds <= 0 or self.ramp_seconds * 2 > self.seconds_per_lap:
+            raise ValueError("Rampes trop longues pour un tour")
         if self.seconds_per_lap <= 0 or self.max_trip_seconds <= 0:
             raise ValueError("Durées invalides")
         if self.motor_power not in range(1, 101) or self.direction not in (-1, 1):
