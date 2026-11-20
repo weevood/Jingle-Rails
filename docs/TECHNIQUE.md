@@ -153,3 +153,16 @@ Premier essai réel : `direction=1` faisait reculer le train, `motor_power=55` �
 Le scénario `test` applique six paliers de montée et cinq de descente, avec des échéances monotoniques afin de limiter l'impact de la latence GATT sur la durée totale. `lap-test` reste un test à puissance constante, **pas** un essai de rampe. Le temps de tour de 15 s reste provisoire : compter les tours réellement effectués et calibrer `seconds_per_lap` ensuite.
 
 La configuration locale `config.local.toml` n'étant pas versionnée, régler `motor_power=40`, `direction=-1`, `ramp_seconds=3.0` sur le Raspberry avant de lancer `test`. Ne pas activer le service périodique avant validation.
+
+### Chronométrage interactif d'un tour (20 novembre 2026)
+
+Pour mesurer le temps d'un tour à puissance constante sans minuterie extérieure :
+
+```bash
+cd ~/Jingle-Rails
+.venv/bin/python -m jingle_rails lap-calibrate
+```
+
+Sur un terminal SSH interactif, le programme allume les phares et lance le moteur à la puissance configurée (actuellement 40 %, sens -1). Placer le train à proximité d'un repère, puis appuyer sur **Entrée** lorsqu'il revient à ce repère : le chronomètre monotone affiche le temps écoulé depuis l'accusé d'envoi de la commande moteur. La fermeture de session effectue ensuite un arrêt moteur et extinction des phares (les quelques millisecondes du stop BLE ne sont pas comptées dans le chronomètre). Arrêt de sécurité automatique au plus tard à `min(120 s, max_trip_seconds)` sans action. Le test de calibration n'applique **pas** de rampe ; la durée obtenue n'est qu'une référence pour les trajets avec accélération et décélération.
+
+CTRL+C provoque le nettoyage du moteur via le bloc `finally` sous réserve que le BLE soit disponible. En cas de problème, utiliser le bouton physique du hub.
