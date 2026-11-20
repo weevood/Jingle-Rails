@@ -42,7 +42,8 @@ def load_config(path: Path):
         start_hour=int(schedule.get("start_hour", 7)),
         end_hour=int(schedule.get("end_hour", 22)),
         seconds_per_lap=float(train.get("seconds_per_lap", 15)),
-        motor_power=int(train.get("motor_power", 55)),
+        motor_power=int(train.get("motor_power", 40)),
+        ramp_seconds=float(train.get("ramp_seconds", 3.0)),
         direction=int(train.get("direction", 1)),
         motor_port=int(train.get("motor_port", 0)),
         light_port=int(train.get("light_port", 1)),
@@ -100,15 +101,24 @@ class Train:
         try:
             # La musique n'empêche jamais le départ du train si l'audio est absent.
             await self.music.start()
-            ramp = min(1.2, duration * .2)
-            steps = (0.4, 0.65, 0.85, 1.0)
-            for factor in steps:
-                await self.motor(max(1, round(self.config.motor_power * factor)))
-                await asyncio.sleep(ramp / len(steps))
-            await asyncio.sleep(max(0, duration - 2*ramp))
-            for factor in (0.85, 0.65, 0.4, 0.2):
-                await self.motor(max(1, round(self.config.motor_power * factor)))
-                await asyncio.sleep(ramp / 4)
+            # Schedule each motor change against a monotonic clock so the
+            # duration includes BLE write latency rather than drifting.
+            started = time.monotonic()
+            ramp = min(self.config.ramp_seconds, duration / 2)
+            # Begin with a modest but moving power; reach cruising speed smoothly.
+            rise = (0.50, 0.60, 0.70, 0.80, 0.90, 1.00)
+            fall = (0.90, 0.80, 0.70, 0.60, 0.50)
+            for i, factor in enumerate(rise):
+                await asyncio.sleep(max(0, started + ramp * i / len(rise) - time.monotonic()))
+                power = max(1, round(self.config.motor_power * factor))
+                LOG.info("Accélération : %d %% puissance", power)
+                await self.motor(power)
+            for i, factor in enumerate(fall):
+                await asyncio.sleep(max(0, started + duration - ramp + ramp * i / len(fall) - time.monotonic()))
+                power = max(1, round(self.config.motor_power * factor))
+                LOG.info("Freinage : %d %% puissance", power)
+                await self.motor(power)
+            await asyncio.sleep(max(0, started + duration - time.monotonic()))
         finally:
             # Ne pas laisser la musique active après une erreur BLE.
             try:
