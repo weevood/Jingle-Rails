@@ -145,3 +145,11 @@ Essai sur le hub 88009 avec `idle-test --minutes 15` de **10:46:27 à 11:01:29**
 - **Choix utilisateur confirmé** : préserver l'éclairage des phares à 30 % entre 17 h et 22 h dans le mode normal `run`.
 
 Prochaine étape : test longue durée du mode repos, puis calibration du circuit et validation du service automatique ; ne pas activer les horaires tant que les rails ne sont pas montés.
+
+### Calibration de la vitesse sur le circuit monté (20 novembre 2026)
+
+Premier essai réel : `direction=1` faisait reculer le train, `motor_power=55` était beaucoup trop rapide. Avec `direction=-1` et `motor_power=25`, le train avance dans le bon sens mais est trop lent. Nouvelle proposition de calibration : vitesse maximale de **40 %** et durée d'accélération/freinage de **3 s chacune**, réglable par `ramp_seconds`.
+
+Le scénario `test` applique six paliers de montée et cinq de descente, avec des échéances monotoniques afin de limiter l'impact de la latence GATT sur la durée totale. `lap-test` reste un test à puissance constante, **pas** un essai de rampe. Le temps de tour de 15 s reste provisoire : compter les tours réellement effectués et calibrer `seconds_per_lap` ensuite.
+
+La configuration locale `config.local.toml` n'étant pas versionnée, régler `motor_power=40`, `direction=-1`, `ramp_seconds=3.0` sur le Raspberry avant de lancer `test`. Ne pas activer le service périodique avant validation.
