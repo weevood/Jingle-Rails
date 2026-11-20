@@ -3,8 +3,9 @@
 hub_address = ""
 motor_port = 0             # A=0, B=1
 light_port = 1             # Ici moteur A, éclairage B
-motor_power = 55
-direction = 1              # -1 pour inverser le sens
+motor_power = 40            # vitesse de pointe à calibrer
+direction = -1             # sens validé sur le circuit monté
+ramp_seconds = 3.0        # montée et freinage progressifs (secondes)
 seconds_per_lap = 15.0     # À mesurer sur le circuit réel
 max_trip_seconds = 240.0
 keepalive_seconds = 60     # demande l'état batterie, connexion BLE maintenue au repos
