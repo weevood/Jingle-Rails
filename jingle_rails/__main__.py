@@ -4,6 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 import logging
+import sys
 import time
 from pathlib import Path
 import tomllib
@@ -178,6 +179,27 @@ async def hub_connection(address):
             LOG.warning("Fermeture BlueZ interrompue (%s) : pas une erreur de commande LEGO", exc)
 
 
+async def wait_for_lap_enter(timeout):
+    """Wait for ENTER on a real terminal without blocking the BLE event loop."""
+    loop = asyncio.get_running_loop()
+    fd = sys.stdin.fileno()
+    if not sys.stdin.isatty():
+        raise RuntimeError("La calibration nécessite un terminal interactif SSH")
+    pressed = loop.create_future()
+
+    def on_input():
+        # A terminal in canonical mode delivers the input only after ENTER.
+        sys.stdin.readline()
+        if not pressed.done():
+            pressed.set_result(time.monotonic())
+
+    loop.add_reader(fd, on_input)
+    try:
+        return await asyncio.wait_for(pressed, timeout=timeout)
+    finally:
+        loop.remove_reader(fd)
+
+
 async def serve(mode, address, config, seconds, hour, minutes=15):
     if not address:
         raise SystemExit("hub_address manquant dans config.local.toml ; exécuter 'scan'")
@@ -212,6 +234,22 @@ async def serve(mode, address, config, seconds, hour, minutes=15):
                                 await asyncio.sleep(2)
                         elif mode == "test":
                             await train.trip(1)
+                        elif mode == "lap-calibrate":
+                            if not sys.stdin.isatty():
+                                raise RuntimeError("Lancer lap-calibrate dans un terminal SSH interactif")
+                            print("Place le train sur un repère du circuit.", flush=True)
+                            print("Appuie sur ENTRÉE quand il repasse devant ce repère.", flush=True)
+                            print("CTRL+C pour interrompre; arrêt automatique au bout de 120 s.", flush=True)
+                            await train.lights(100)
+                            await train.motor(config.motor_power)
+                            started_at = time.monotonic()
+                            LOG.info("Chronomètre démarré, vitesse constante %d %%", config.motor_power)
+                            try:
+                                passed_at = await wait_for_lap_enter(timeout=min(120, config.max_trip_seconds))
+                            except TimeoutError:
+                                LOG.warning("Temps limite atteint : arrêt de sécurité")
+                            else:
+                                LOG.info("TEMPS MESURÉ POUR UN TOUR : %.3f secondes", passed_at - started_at)
                         elif mode == "lap-test":
                             # Mesurer les secondes, sans modifier automatiquement la configuration.
                             await train.lights(100)
@@ -266,7 +304,7 @@ async def serve(mode, address, config, seconds, hour, minutes=15):
 
 def main():
     parser = argparse.ArgumentParser(description="Jingle Rails — horloge ferroviaire de Noël")
-    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "hour-test", "lights-test", "ble-hold", "idle-test", "music-test"))
+    parser.add_argument("mode", choices=("scan", "run", "test", "lap-test", "lap-calibrate", "hour-test", "lights-test", "ble-hold", "idle-test", "music-test"))
     parser.add_argument("--config", type=Path, default=ROOT / "config.local.toml")
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--hour", type=int, default=3)
