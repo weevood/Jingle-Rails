@@ -124,3 +124,33 @@ def test_subscription_before_first_command(monkeypatch):
 
     asyncio.run(exercise())
     assert events == ["connect", "notify", "write", "disconnect"]
+
+
+def test_lap_calibration_enter(monkeypatch):
+    import os
+    import sys
+    import time
+    from jingle_rails.__main__ import wait_for_lap_enter
+
+    reader, writer = os.pipe()
+    class InputStream:
+        def fileno(self):
+            return reader
+        def isatty(self):
+            return True
+        def readline(self):
+            return os.read(reader, 1024)
+
+    monkeypatch.setattr(sys, "stdin", InputStream())
+
+    async def exercise():
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.01, os.write, writer, b"\\n")
+        result = await wait_for_lap_enter(timeout=1)
+        assert 0 <= time.monotonic() - result < 1
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        os.close(reader)
+        os.close(writer)
