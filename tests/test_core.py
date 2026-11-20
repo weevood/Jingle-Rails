@@ -43,3 +43,10 @@ def test_battery_request_and_keepalive_validation():
         Settings(keepalive_seconds=5).validate()
     with pytest.raises(ValueError):
         Settings(keepalive_seconds=301).validate()
+
+def test_ramp_settings():
+    Settings(motor_power=40, ramp_seconds=3.0).validate()
+    with pytest.raises(ValueError):
+        Settings(ramp_seconds=8, seconds_per_lap=15).validate()
+    with pytest.raises(ValueError):
+        Settings(ramp_seconds=0).validate()
